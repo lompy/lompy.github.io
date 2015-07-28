@@ -3,7 +3,7 @@ title: Ash tree stump blog
 email: asromanist@gmail.com
 description: > # this means to ignore newlines until "baseurl:"
   Ash tree stump blog
-baseurl: "" # the subpath of your site, e.g. /blog/
+baseurl: "/" # the subpath of your site, e.g. /blog/
 url: "https://lompy.github.io" # the base hostname & protocol for your site
 twitter_username: 10mpy
 github_username:  lompy
