@@ -5,9 +5,10 @@ categories: ruby repl from-scratch closure binding ripper
 ---
 ## Shortest REPL possible.
 
-Ruby ships with default REPL known as IRB (Interactive RuBy) and every ruby
-programmer knows that program. I like to know how stuff works so I've decided to
-write my own minimal viable REPL from scratch.
+Ruby ships with default REPL (Read Eavaluate Print Loop) known as IRB
+(Interactive RuBy) and every ruby programmer knows that program. I like to know
+how stuff works so I've decided to write my own minimal viable REPL from
+scratch.
 
 And thanks to ruby's metaprogramming `eval` feature you can do it in 1 line
 of code.
