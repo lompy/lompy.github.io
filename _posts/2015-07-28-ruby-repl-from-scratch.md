@@ -5,19 +5,22 @@ categories: ruby repl from-scratch closure binding ripper
 ---
 ## Shortest REPL possible.
 
-Ruby ships with default REPL (Read Eavaluate Print Loop) known as IRB
-(Interactive RuBy) and every ruby programmer knows that program. I like to know
-how stuff works so I've decided to write my own minimal viable REPL from
-scratch.
+Ruby ships with default REPL (Read Evaluate Print Loop) known as IRB
+(Interactive RuBy) and every ruby programmer knows that program. Let's write
+our own REPL from scratch and learn something new in the process. We'll stick
+with minimal viable version just to understand the very basics of building a
+REPL.
 
-And thanks to ruby's metaprogramming `eval` feature you can do it in 1 line
+Thanks to ruby's metaprogramming `Kernel#eval` feature you can do it in one line
 of code.
 
     # repl.rb
-    # Loop Print      Eval Read
+    # loop print      eval read
     loop { puts "=> #{eval(gets).inspect}" }
 
-It's pretty darn minimal but let's see if it's viable.
+We read user input with `gets` until encounter any new line character, then
+evaulate aquired string with `eval` and print the result with `puts`. This is
+pretty minimal but let's see if the first version is viable.
 
 Simple ruby one-liners.
 
@@ -30,28 +33,28 @@ Simple ruby one-liners.
     => 2
     exit
 
-Good. Let's try to remember some results.
+Good. Now let's try to remember some results between evaluations.
 
+    $ ruby repl.rb
     a = 10 + 20
     => 30
     a
-    repl.rb:3:in `eval': undefined local variable or method `a' for main:Object (NameError)
-      from min_repl.rb:3:in `eval'
-      from min_repl.rb:3:in `block in <main>'
-      from min_repl.rb:3:in `loop'
-      from min_repl.rb:3:in `<main>'
+    (eval):1:in `block in <main>': undefined local variable or method `a' for main:Object (NameError)
+            from repl.rb:3:in `eval'
+            from repl.rb:3:in `block in <main>'
+            from repl.rb:3:in `loop'
+            from repl.rb:3:in `<main>'
 
-In our viable REPL we want variables to persist between queries. Why don't they?
+In our minimal viable REPL we want variables to persist. Why don't they?
 
-## Environment.
-Turned out when I'm calling 'eval' in a loop every single call creates new
-environment. The environment being a table of available variables with current
-lexical scope and current `self` value. In ruby docs they call it
-"execution context".  Here I'll use "environment" as it is shorter.
+## Execution Context.
+Turns out when I'm calling `eval` in a loop every single call creates a new
+execution context. This is a table of all available variables within the
+current lexical scope and the current `self` value.
 
-Environments can be nested. In that case variables from enclosing environment
-are visible from child environment and can be affected in this environment.
-We can create nested environment in ruby by crating a block.
+Contexts can be nested. In that case variables from the enclosing context are
+visible from the child context and can be affected in this context.
+We can create nested context in ruby by crating a block.
 
     a = 10
     increment = proc { a += 1 }
@@ -59,21 +62,22 @@ We can create nested environment in ruby by crating a block.
     2.times(&increment)
     a #=> 12
 
-But if we create the new environment first, then it doesn't know about `a`
-variable created later in the enclosing environment.
+But if we change the order of lines and create the proc first, then it doesn't
+know about `a` variable created later in the enclosing context.
 
     increment = proc { a += 1 }
     a = 10
     2.times(&increment)
-    NoMethodError: undefined method `+' for nil:NilClass
-      from (irb):2:in `block in irb_binding'
-      from (irb):4:in `times'
-      from (irb):4
-      from /home/lompy/.rvm/rubies/ruby-2.2.1/bin/irb:11:in `<main>'
+    (irb):1:in `block in <main>': undefined method `+' for nil:NilClass (NoMethodError)
+            from (irb):3:in `times'
+            from (irb):3:in `<main>'
+            from /usr/lib/ruby/gems/3.0.0/gems/irb-1.3.5/exe/irb:11:in `<top (required)>'
+            from /usr/bin/irb:23:in `load'
+            from /usr/bin/irb:23:in `<main>'
 
-Call to `eval` basically works the same way as creating blocks regarding to
-code being evaluated. Lets create a memory variable in enclosing environment
-and see what happens.
+Call to `eval` basically works the same way as creating blocks regarding to code
+being evaluated. Lets create a memory variable in enclosing context and see what
+happens.
 
     # repl.rb
     memory = {}
@@ -82,8 +86,8 @@ and see what happens.
 And in a REPL itself.
 
     $ ruby repl.rb
-    memory[:foo] = 'bar'
-    => bar
+    memory[:foo] = "bar"
+    => "bar"
     memory
     => {:foo=>"bar"}
     exit
@@ -91,14 +95,14 @@ And in a REPL itself.
 Cool, now we can persist some data. But can we do better?
 
 ## Binding.
-Turned out we can as ruby provides another powerful metaprogramming feature --
-`Binding`. An instance of `Binding` class holds a reference to environment
-in which it was created and can be used later on with `eval` to evaluate
-the code in environment referred by that binding. We can create binding object
-anywhere with `Kernel#binding` and evaluate the code in the binding's
-environment with `Binding#eval` or `eval(<code>, <binding>)`.
+If IRB can then of cource we can do it too. Ruby provides another powerful
+metaprogramming feature -- `Binding`. An instance of `Binding` class holds a
+reference to the context in which it was created and can be used later with
+`eval` to evaluate the code in the context referred by that binding. We can
+create binding object anywhere with `Kernel#binding` and evaluate the code in
+binding's context with `Binding#eval` or `Kernel#eval(<code>, <binding>)`.
 
-Let's use this knowledge to evaluate REPL code in the enclosing environment.
+Let's try to evaluate REPL code in the enclosing context.
 
     # repl.rb
     b = binding
@@ -111,37 +115,47 @@ Let's use this knowledge to evaluate REPL code in the enclosing environment.
     => 10
     exit
 
-Supercool, now we have variables. There also a constant
-`Object::TOPLEVEL_BINDING` which refers top level execution environment as you
-can conclude from name. So we can still hold on to one line of code.
+Supercool, now we have variables. The problem with this approach is that we are
+not allowed to use variable `b` in our REPL.
+
+    $ ruby repl.rb
+    b = 10
+    => 10
+    b + 20
+    repl.rb:3:in `block in <main>': private method `eval' called for 10:Integer (NoMethodError)
+            from repl.rb:3:in `loop'
+            from repl.rb:3:in `<main>'
+
+We can overcome this using some difficult to guess variable name but there is a
+better way. Ruby defines constant `Object::TOPLEVEL_BINDING` which refers top
+level execution context as you can conclude from the name. Thanks to that we can
+still keep our program in one line of code.
 
     # repl.rb
     loop { puts "=> #{TOPLEVEL_BINDING.eval(gets).inspect}" }
 
 Is it viable now? Not quite yet. Suppose we want to define a new class and we
-want it to be readable by separating definition with line breaks.
+want the definition to be separated with line breaks for readability.
 
+    $ ruby repl.rb
     class Foo
-    min_repl.rb:2:in `eval': <main>: syntax error, unexpected end-of-input (SyntaxError)
-      from min_repl.rb:2:in `block in <main>'
-      from min_repl.rb:2:in `loop'
-      from min_repl.rb:2:in `<main>'
+    repl.rb:2:in `eval': (eval):1: syntax error, unexpected end-of-input, expecting `end' (SyntaxError)
+            from repl.rb:2:in `block in <main>'
+            from repl.rb:2:in `loop'
+            from repl.rb:2:in `<main>'
 
-Doesn't work. We evaluate every single line hence every single line must be
-valid ruby expression. If we want to separate expression we also need a read
-loop. And in order to do that we need to come up with some kind of
+This doesn't work. We evaluate every single line hence every single line must be
+valid ruby expression. If we want to separate expression with line breaks we also
+need a read loop. And in order to do that we need to come up with some kind of
 a `valid_expression?` predicate to terminate the read loop. How can we check if
 a string of ruby code is valid expression?
 
 ## Ripper.
-Enter `Ripper`.
-
-Of course we can rescue from `SyntaxError`s but there's better solution. The
-thing is ruby standard library provides a ruby parser. How cool is that!
-The name of the module is `Ripper`. Ripper can tokenize any string of ruby
-and create abstract syntax trees with `Ripper.sexp(<code>)`. And if you pass
-an invalid ruby expression to `sexp` it just returns `nil`. Let's get strait to
-business.
+Of course we can rescue from `SyntaxError`s but there is a better solution. Ruby
+standard library provides a ruby parser. How cool is that! The name of the module
+is `Ripper`. Ripper can tokenize any string of ruby and create abstract syntax
+tree with `Ripper.sexp(<code>)`. And if you pass an invalid ruby expression to
+`sexp` it just returns `nil`. Let's see how can we implement the read loop.
 
     # repl.rb
     require 'ripper'
@@ -151,6 +165,7 @@ business.
       result = ''
       loop do
         result += "#{gets}\n"
+        # break from the loop on valid sexp and return result
         break result if Ripper.sexp(result)
         print '* '
       end
@@ -158,22 +173,29 @@ business.
 
     loop { puts "=> #{TOPLEVEL_BINDING.eval(read).inspect}" }
 
-I also added a `'* '` indicator of active read loop. Little test.
+I added a `*` indicator of the active read loop. Let's do a little test.
 
     $ ruby repl.rb
-    > class Foo
-    *   def bar
-    *     'barbar'
+    > class Test
+    *   def initialize(str)
+    *     @str = str
+    *   end
+    *   def hello
+    *     puts "Hello, #{@str}"
     *   end
     * end
-    => :bar
-    > Foo.new.bar
-    => "barbar"
-    > exit
+    => :hello
+    > Test.new("reader").hello
+    Hello, reader
+    => nil
+    > 
 
-And this is just enough for me to be viable in scope of this post.
+And this is just enough for me to be viable. We have minimal viable REPL in ruby
+in less than 15 lines of code. Pretty impressive!
 
-We have minimal viable REPL in ruby in less than 15 lines of code.
-Pretty impressive!
+## More.
+To make our REPL look more like IRB we can add things such as exception handling
+or auto indentation and syntax highlighting, but that is outside of the scope of
+this article.
 
-## Beyond.
+Thank you for your time!
