@@ -10,3 +10,5 @@ github_username:  lompy
 
 # Build settings
 markdown: kramdown
+highlighter: rouge
+input: GFM
